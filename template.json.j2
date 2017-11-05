@@ -1,0 +1,313 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "hello stack",
+  "Resources": {
+    "HelloLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/{{ stage }}-hello"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "{{ stage }}-hello-lambda",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/{{ stage }}-hello:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/{{ stage }}-hello:*:*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": "{{ stage }}-hello-lambda" 
+      }
+    },
+    "HelloLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "{{ deployment_bucket }}",
+          "S3Key": "{{ stage }}/hello/hello.zip"
+        },
+        "FunctionName": "{{ stage }}-hello",
+        "Handler": "handler.hello",
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs6.10",
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "SAY_HELLO_TO": "{{ say_hello_to }}"
+          }
+        }
+      },
+      "DependsOn": [
+        "HelloLogGroup",
+        "IamRoleLambdaExecution"
+      ]
+    },
+    "ApiGatewayRestApi": {
+      "Type": "AWS::ApiGateway::RestApi",
+      "Properties": {
+        "Name": "{{ stage }}"
+      }
+    },
+    "ApiGatewayResourceWhateverVar": {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "ApiGatewayRestApi",
+            "RootResourceId"
+          ]
+        },
+        "PathPart": "{whatever}",
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayMethodWhateverVarGet": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "HttpMethod": "GET",
+        "RequestParameters": {},
+        "ResourceId": {
+          "Ref": "ApiGatewayResourceWhateverVar"
+        },
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "ApiKeyRequired": true,
+        "AuthorizationType": "NONE",
+        "Integration": {
+          "IntegrationHttpMethod": "POST",
+          "Type": "AWS",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:apigateway:",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "HelloLambdaFunction",
+                    "Arn"
+                  ]
+                },
+                "/invocations"
+              ]
+            ]
+          },
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ \"whatever\" : \"$input.params('whatever')\" }"
+          },
+          "IntegrationResponses": [
+            {
+              "StatusCode": 200,
+              "SelectionPattern": "",
+              "ResponseParameters": {},
+              "ResponseTemplates": {}
+            },
+            {
+              "StatusCode": 400,
+              "SelectionPattern": "[\\s\\S]*\\[400\\][\\s\\S]*",
+              "ResponseParameters": {},
+              "ResponseTemplates": {}
+            },
+            {
+              "StatusCode": 500,
+              "SelectionPattern": "[\\s\\S]*(Process\\s?exited\\s?before\\s?completing\\s?request|\\[500\\])[\\s\\S]*",
+              "ResponseParameters": {},
+              "ResponseTemplates": {}
+            },
+            {
+              "StatusCode": 504,
+              "SelectionPattern": "([\\s\\S]*\\[504\\][\\s\\S]*)|(^[Task timed out].*)",
+              "ResponseParameters": {},
+              "ResponseTemplates": {}
+            }
+          ]
+        },
+        "MethodResponses": [
+          {
+            "ResponseParameters": {},
+            "ResponseModels": {},
+            "StatusCode": 200
+          },
+          {
+            "ResponseParameters": {},
+            "ResponseModels": {},
+            "StatusCode": 400
+          },
+          {
+            "ResponseParameters": {},
+            "ResponseModels": {},
+            "StatusCode": 500
+          },
+          {
+            "ResponseParameters": {},
+            "ResponseModels": {},
+            "StatusCode": 504
+          }
+        ]
+      }
+    },
+    "ApiGatewayDeployment": {
+      "Type": "AWS::ApiGateway::Deployment",
+      "Properties": {
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "StageName": "{{ stage }}"
+      },
+      "DependsOn": [
+        "ApiGatewayMethodWhateverVarGet"
+      ]
+    },
+    "ApiGatewayApiKey1": {
+      "Type": "AWS::ApiGateway::ApiKey",
+      "Properties": {
+        "Enabled": true,
+        "Name": "internal",
+        "StageKeys": [
+          {
+            "RestApiId": {
+              "Ref": "ApiGatewayRestApi"
+            },
+            "StageName": "{{ stage }}"
+          }
+        ]
+      },
+      "DependsOn": "ApiGatewayDeployment"
+    },
+    "ApiGatewayUsagePlan": {
+      "Type": "AWS::ApiGateway::UsagePlan",
+      "DependsOn": "ApiGatewayDeployment",
+      "Properties": {
+        "ApiStages": [
+          {
+            "ApiId": {
+              "Ref": "ApiGatewayRestApi"
+            },
+            "Stage": "{{ stage }}"
+          }
+        ],
+        "Description": "Usage plan for {{ stage }} stage",
+        "UsagePlanName": "{{ stage }}"
+      }
+    },
+    "ApiGatewayUsagePlanKey1": {
+      "Type": "AWS::ApiGateway::UsagePlanKey",
+      "Properties": {
+        "KeyId": {
+          "Ref": "ApiGatewayApiKey1"
+        },
+        "KeyType": "API_KEY",
+        "UsagePlanId": {
+          "Ref": "ApiGatewayUsagePlan"
+        }
+      }
+    },
+    "HelloLambdaPermissionApiGateway": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "HelloLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:aws:execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiGatewayRestApi"
+              },
+              "/*/*"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ServiceEndpoint": {
+      "Description": "URL of the service endpoint",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "ApiGatewayRestApi"
+            },
+            ".execute-api.us-east-1.amazonaws.com/{{ stage }}"
+          ]
+        ]
+      }
+    }
+  }
+}
