@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: hello stack
+Resources:
+  ApiGatewayRestApi:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: dev
+  ApiGatewayMethodDefaultGet:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      HttpMethod: GET
+      RequestParameters: {}
+      ResourceId: !GetAtt
+        - ApiGatewayRestApi
+        - RootResourceId
+      RestApiId: !Ref ApiGatewayRestApi
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: 200
+            SelectionPattern: ''
+            ResponseParameters: {}
+            ResponseTemplates: {}
+      MethodResponses:
+        - ResponseParameters: {}
+          ResponseModels: {}
+          StatusCode: 200
+  ApiGatewayDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: dev
+    DependsOn:
+      - ApiGatewayMethodDefaultGet
+  ApiGatewayApiKey1:
+    Type: 'AWS::ApiGateway::ApiKey'
+    Properties:
+      Enabled: true
+      Name: internal
+      StageKeys:
+        - RestApiId: !Ref ApiGatewayRestApi
+          StageName: dev
+    DependsOn: ApiGatewayDeployment
+  ApiGatewayUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    DependsOn: ApiGatewayDeployment
+    Properties:
+      ApiStages:
+        - ApiId: !Ref ApiGatewayRestApi
+          Stage: dev
+      Description: Usage plan for dev stage
+      UsagePlanName: dev
+  ApiGatewayUsagePlanKey1:
+    Type: 'AWS::ApiGateway::UsagePlanKey'
+    Properties:
+      KeyId: !Ref ApiGatewayApiKey1
+      KeyType: API_KEY
+      UsagePlanId: !Ref ApiGatewayUsagePlan
+Outputs:
+  ServiceEndpoint:
+    Description: URL of the service endpoint
+    Value: !Join 
+      - ''
+      - - 'https://'
+        - !Ref ApiGatewayRestApi
+        - .execute-api.us-east-1.amazonaws.com/dev
+    Export:
+      Name: ExportedEndpoint
+  ApiKey:
+    Description: Kee
+    Value: !Ref ApiGatewayApiKey1
+    Export:
+      Name: ExportedKey
