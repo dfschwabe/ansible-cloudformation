@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: base stack
+Parameters:
+  DeploymentBucketName:
+    Type: String
+Resources:
+  ApiGatewayApiKey:
+    Type: 'AWS::ApiGateway::ApiKey'
+    Properties:
+      Enabled: true
+      Name: shared-key
+  DeploymentBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref DeploymentBucketName
+
+Outputs:
+  ApiGatewayApiKey:
+    Description: Shared API Key
+    Value: !Ref ApiGatewayApiKey
+    Export:
+      Name: exported-api-key
+  DeploymentBucket:
+    Description: It puts the lambdas in the bucket
+    Value: !Ref DeploymentBucket
+    Export:
+      Name: exported-deployment-bucket
+

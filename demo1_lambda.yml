@@ -46,7 +46,7 @@ Resources:
         S3Bucket: !Ref  DeploymentBucket
         S3Key: demo/hello.zip
       FunctionName: hello
-      Handler: handler.hello
+      Handler: hello.index
       MemorySize: 1024
       Role: !GetAtt
         - IamRoleLambdaExecution
