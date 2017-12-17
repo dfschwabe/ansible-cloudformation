@@ -1,2 +1,4 @@
 *.zip
 *template.json
+*.swp
+node_modules/*
