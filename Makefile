@@ -49,3 +49,10 @@ demo5:
 	aws s3 cp password.zip s3://mynewdeploymentbucketweeee/demo/
 
 	aws cloudformation create-stack --stack-name password --template-body file://demo5_api.yml --capabilities CAPABILITY_NAMED_IAM
+
+fin:
+	aws cloudformation delete-stack --stack-name password
+
+	aws s3 rb --force s3://mynewdeploymentbucketweeee
+
+	aws cloudformation delete-stack --stack-name base
