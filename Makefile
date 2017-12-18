@@ -36,3 +36,16 @@ demo4c:
 	aws s3 cp goodbye.zip s3://mynewdeploymentbucketweeee/demo/
 
 	aws cloudformation create-stack --stack-name goodbye --template-body file://demo4_nested.yml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=ServiceName,ParameterValue=goodbye
+
+demo5:
+	aws cloudformation delete-stack --stack-name hello
+
+	aws cloudformation delete-stack --stack-name goodbye
+
+	ansible localhost -m template -a "src=./demo5_api.yml.j2 dest=./demo5_api.yml" -e @demo5_vault.yml -e "service_name=password"
+
+	zip password.zip password.js
+
+	aws s3 cp password.zip s3://mynewdeploymentbucketweeee/demo/
+
+	aws cloudformation create-stack --stack-name password --template-body file://demo5_api.yml --capabilities CAPABILITY_NAMED_IAM
