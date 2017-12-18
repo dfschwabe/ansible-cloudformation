@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: hello stack
+Parameters:
+  ServiceName:
+    Type: String
+Resources:
+  NestedStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - https://s3.amazonaws.com
+          - !ImportValue exported-deployment-bucket
+          - demo/demo4_api.template
+      Parameters:
+        ServiceName: !Ref ServiceName
